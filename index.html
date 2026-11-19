@@ -124,10 +124,13 @@
   ];
 
   // Áudio sintetizado via Web Audio API
+ // Áudio e trilha sonora sintetizada via Web Audio API
   class SoundEngine {
     constructor() {
       this.ctx = null;
       this.muted = false;
+      this.bgmTimer = null;
+      this.step = 0;
     }
     init() {
       if (!this.ctx) {
@@ -137,9 +140,50 @@
       if (this.ctx && this.ctx.state === "suspended") {
         this.ctx.resume();
       }
+      this.startMusic();
+    }
+    startMusic() {
+      if (this.bgmTimer || !this.ctx) return;
+      const bassNotes = [110, 110, 146.83, 146.83, 130.81, 130.81, 164.81, 146.83];
+      const leadNotes = [440, 0, 523.25, 587.33, 659.25, 587.33, 523.25, 392.00,
+                         440, 0, 523.25, 659.25, 783.99, 659.25, 587.33, 523.25];
+      this.bgmTimer = setInterval(() => {
+        if (this.muted || !this.ctx || this.ctx.state !== "running") return;
+        const now = this.ctx.currentTime;
+
+        // Linha de baixo pulsante
+        const bassFreq = bassNotes[this.step % bassNotes.length];
+        const bassOsc = this.ctx.createOscillator();
+        const bassGain = this.ctx.createGain();
+        bassOsc.type = "triangle";
+        bassOsc.frequency.setValueAtTime(bassFreq, now);
+        bassGain.gain.setValueAtTime(0.055, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+        bassOsc.connect(bassGain);
+        bassGain.connect(this.ctx.destination);
+        bassOsc.start(now);
+        bassOsc.stop(now + 0.21);
+
+        // Melodia arcade espacial
+        const leadFreq = leadNotes[this.step % leadNotes.length];
+        if (leadFreq > 0) {
+          const leadOsc = this.ctx.createOscillator();
+          const leadGain = this.ctx.createGain();
+          leadOsc.type = "sine";
+          leadOsc.frequency.setValueAtTime(leadFreq, now);
+          leadGain.gain.setValueAtTime(0.032, now);
+          leadGain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+          leadOsc.connect(leadGain);
+          leadGain.connect(this.ctx.destination);
+          leadOsc.start(now);
+          leadOsc.stop(now + 0.19);
+        }
+        this.step++;
+      }, 220);
     }
     toggleMute() {
       this.muted = !this.muted;
+      if (!this.muted) this.init();
       return this.muted;
     }
     play(type) {
@@ -197,7 +241,7 @@
       }
     }
   }
-
+  
   const sfx = new SoundEngine();
 
   // Utilitários de colisão e texto
